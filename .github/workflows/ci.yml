@@ -1,19 +1,165 @@
+
 name: CI
 
-on: push
+on:
+  push:
+    paths:
+      - "src/**"
+      - "data/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/**"
+      - ".github/actions/**"
+      - "kontroller/**"
+
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "data/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/**"
+      - ".github/actions/**"
+      - "kontroller/**"
+
+  schedule:
+    - cron: "0 6 * * 1"
+      timezone: "Europe/Stockholm"
+
+  workflow_dispatch:
+    inputs:
+      csv_file:
+        description: "Välj CSV-fil att validera"
+        required: true
+        type: choice
+        default: "kundbas.csv"
+        options:
+          - "kundbas.csv"
+          - "kundbas_ny_leverans.csv"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  allt:
+  datakontroll:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v7
+      - uses: ./.github/actions/setup-project
         with:
-          python-version: "3.13"
+          python-version: "3.11"
+      - name: Validate customer data
+        env:
+          CSV_FILE: ${{ inputs.csv_file || 'kundbas.csv' }}
+        run: python -m kontroller.validera "data/$CSV_FILE"
 
-      - run: pip install -e .
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-project
+        with:
+          python-version: ${{ matrix.python-version }}
+          install-dev: "true"
 
       - run: pytest
 
+  train:
+    needs: [test, datakontroll]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-project
+        with:
+          python-version: "3.11"
+
       - run: python -m churn.model
+
+      - name: Upload model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: modell-${{ github.sha }}
+          path: outputs/
+          if-no-files-found: error
+
+  evaluate:
+    needs: train
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-project
+        with:
+          python-version: "3.11"
+
+      - name: Download model artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: modell-${{ github.sha }}
+          path: outputs/
+
+      - name: Write model summary
+        run: |
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+
+          metrics = json.loads(
+              Path("outputs/matvarden.json").read_text()
+          )
+
+          print("## Modellutvärdering")
+          print()
+          print("| Mätvärde | Värde |")
+          print("|---|---|")
+          print(f"| ROC AUC | {metrics['roc_auc']:.4f} |")
+          print(f"| Accuracy | {metrics['accuracy']:.4f} |")
+          print(f"| Commit | `{metrics['commit']}` |")
+          print(f"| Data SHA256 | `{metrics['data_sha256']}` |")
+          PY
+
+      - name: Evaluate model
+        run: python -m churn.evaluate
+
+  ringlista:
+    needs: evaluate
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-project
+        with:
+          python-version: "3.11"
+
+      - name: Download approved model
+        uses: actions/download-artifact@v4
+        with:
+          name: modell-${{ github.sha }}
+          path: outputs/
+
+      - name: Generate ringlista
+        run: python -m churn.score
+
+      - name: Upload ringlista
+        uses: actions/upload-artifact@v4
+        with:
+          name: ringlista-${{ github.sha }}
+          path: outputs/ringlista.csv
+          if-no-files-found: error

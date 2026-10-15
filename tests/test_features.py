@@ -30,3 +30,11 @@ def test_indata_andras_inte(liten_df):
     original = liten_df.copy()
     skapa_features(liten_df)
     pd.testing.assert_frame_equal(liten_df, original)
+
+
+def test_region_versaler(liten_df):
+    liten_df.loc[0, "region"] = "STOCKHOLM"
+
+    resultat = skapa_features(liten_df)
+
+    assert resultat["region"].iloc[0] == "Stockholm"

@@ -1,0 +1,31 @@
+name: Setup project
+description: Install Python and project dependencies
+
+inputs:
+  python-version:
+    description: Pythonversion to use
+    required: true
+  install-dev:
+    description: Install optional dev dependencies
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v7
+      with:
+        python-version: ${{ inputs.python-version }}
+        cache: pip
+        cache-dependency-path: pyproject.toml
+    
+    - name: Install dependencies
+      shell: bash
+      env:
+        INSTALL_DEV: ${{ inputs.install-dev }}
+      run: |
+        if [[ "$INSTALL_DEV" == "true" ]]; then
+          pip install -e ".[dev]"
+        else
+          pip install -e .
+        fi

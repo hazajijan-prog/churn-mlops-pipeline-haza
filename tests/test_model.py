@@ -30,7 +30,7 @@ def test_reproducerbar(resultat):
     assert igen == matvarden
 
 
-def test_senaste_traningen_ar_godkand():
-    # Lades till efter förra incidenten: kolla att senaste träningen har ett rimligt ROC AUC.
-    matvarden = json.loads(Path("outputs/matvarden.json").read_text())
+def test_modell_roc_auc(resultat):
+    _, matvarden = resultat
+
     assert matvarden["roc_auc"] >= 0.70

@@ -1,0 +1,274 @@
+{
+  "repo": "pytt156/churn-mlops-pipeline",
+  "owner": "pytt156",
+  "project_title": "Churn MLOps Lab",
+  "labels": {
+    "ci": {
+      "color": "0969da",
+      "description": "GitHub Actions and code checks"
+    },
+    "data": {
+      "color": "1d76db",
+      "description": "Data checks and validation"
+    },
+    "model": {
+      "color": "8250df",
+      "description": "Training and model quality"
+    },
+    "release": {
+      "color": "0e8a16",
+      "description": "Artifacts, containers and publishing"
+    },
+    "docs": {
+      "color": "fbca04",
+      "description": "Documentation and final checks"
+    },
+    "setup": {
+      "color": "c5def5",
+      "description": "Repository setup and collaboration"
+    },
+    "vg": {
+      "color": "d93f0b",
+      "description": "Optional individual improvement work"
+    },
+    "role:A": {
+      "color": "d4c5f9",
+      "description": "Main responsibility: person A"
+    },
+    "role:B": {
+      "color": "d4c5f9",
+      "description": "Main responsibility: person B"
+    },
+    "role:C": {
+      "color": "d4c5f9",
+      "description": "Main responsibility: person C"
+    },
+    "team": {
+      "color": "eeeeee",
+      "description": "Shared responsibility"
+    }
+  },
+  "work": [
+    {
+      "key": "setup",
+      "title": "Set up team workflow",
+      "owner": "team",
+      "label": "setup",
+      "description": "Get the repo ready for three people working through pull requests. Do this together before splitting up.",
+      "children": [
+        {
+          "title": "Check the starter project locally",
+          "description": "Install the project, run pytest and check the existing CI run. Record what is failing before changing anything.",
+          "done_when": "Everyone can run the project locally and we know the starting point."
+        },
+        {
+          "title": "Add collaborators and protect main",
+          "description": "Invite the other two group members. Require pull requests and at least one review before merging. Check what protection rules the repo plan supports.",
+          "done_when": "Direct pushes to main are restricted and someone else reviews each PR."
+        },
+        {
+          "title": "Agree on branches and reviews",
+          "description": "Use small feature branches, link PRs to issues and review each other’s changes. Each person should create and review at least one merged PR.",
+          "done_when": "All three have a clear way to contribute and review changes."
+        }
+      ]
+    },
+    {
+      "key": "code",
+      "title": "Run code checks in CI",
+      "owner": "A",
+      "label": "ci",
+      "description": "Start with the tests in tests/ and the existing workflow in .github/workflows/ci.yml. Keep changes small.",
+      "children": [
+        {
+          "title": "Fix the test environment",
+          "description": "Review Python version and dependency installation in the current workflow. Use the project’s dev dependencies for tests.",
+          "done_when": "The test job can run on a clean GitHub runner."
+        },
+        {
+          "title": "Run tests on pull requests",
+          "description": "Run the code tests for pull requests and updates to main. Keep failures visible in the PR.",
+          "done_when": "A failing test makes the CI check fail."
+        },
+        {
+          "title": "Check a deliberately failing test",
+          "description": "Confirm that a broken assertion produces a red workflow run. Revert the test change afterwards.",
+          "done_when": "There is a recorded passing and failing run."
+        }
+      ]
+    },
+    {
+      "key": "data",
+      "title": "Validate training data",
+      "owner": "B",
+      "label": "data",
+      "description": "Check data/kundbas.csv before model training. Validation should fail with a useful error, not silently drop bad rows.",
+      "children": [
+        {
+          "title": "Define data checks",
+          "description": "Check required columns, types, missing values and sensible values for the target. Base the rules on the actual dataset.",
+          "done_when": "Checks reflect the data used by the training code."
+        },
+        {
+          "title": "Add tests for valid and invalid data",
+          "description": "Test the expected dataset and at least one broken example, such as a missing column or invalid target.",
+          "done_when": "Good data passes and bad data fails."
+        },
+        {
+          "title": "Add a separate data validation job",
+          "description": "Run data validation before training with an explicit dependency in GitHub Actions.",
+          "done_when": "Training is skipped if validation fails."
+        },
+        {
+          "title": "Save evidence of a blocked training run",
+          "description": "Trigger a failing validation run safely using test data or a temporary branch. Do not commit broken production data.",
+          "done_when": "The workflow shows validation failing and training not starting."
+        }
+      ]
+    },
+    {
+      "key": "train",
+      "title": "Train and evaluate the model in CI",
+      "owner": "C",
+      "label": "model",
+      "description": "Use the existing training and evaluation modules as the starting point. The goal is a repeatable model quality check.",
+      "children": [
+        {
+          "title": "Run model training in the workflow",
+          "description": "Run python -m churn.model after data validation. Check where the model and metrics are written.",
+          "done_when": "CI can train the model from a clean checkout."
+        },
+        {
+          "title": "Set a model quality threshold",
+          "description": "Review the existing ROC AUC evaluation and baseline results. Choose or justify the minimum acceptable value.",
+          "done_when": "The threshold has a written reason based on the model and dataset."
+        },
+        {
+          "title": "Fail CI when model quality drops",
+          "description": "Run python -m churn.evaluate after training and verify its exit status stops the job on a bad model.",
+          "done_when": "Models below the threshold cannot pass the pipeline."
+        }
+      ]
+    },
+    {
+      "key": "artifact",
+      "title": "Track and save model outputs",
+      "owner": "A",
+      "label": "release",
+      "description": "Once training passes, keep the model and the run details together so we can see what produced it.",
+      "children": [
+        {
+          "title": "Save the model and metrics as an artifact",
+          "description": "Upload outputs/modell.joblib and outputs/matvarden.json after a successful evaluation. Use the paths actually produced by training.",
+          "done_when": "The model and metrics can be downloaded from a successful workflow run."
+        },
+        {
+          "title": "Record commit and data version",
+          "description": "Save the Git commit SHA and a checksum or other stable identifier for the training dataset alongside the metrics.",
+          "done_when": "We can link a model artifact to the code and input data it came from."
+        },
+        {
+          "title": "Check failed runs do not publish approved artifacts",
+          "description": "Make publishing depend on the evaluation result. Separate diagnostic logs from approved model artifacts.",
+          "done_when": "A failed quality check cannot create an approved model release."
+        }
+      ]
+    },
+    {
+      "key": "docker",
+      "title": "Build and test the Docker image",
+      "owner": "B",
+      "label": "release",
+      "description": "Package the model for a reproducible runtime. Keep the image focused on what the smoke test needs.",
+      "children": [
+        {
+          "title": "Write a Dockerfile",
+          "description": "Use a compatible Python version and install runtime dependencies. Include the approved model artifact.",
+          "done_when": "The image builds locally and starts without manual setup."
+        },
+        {
+          "title": "Add a model smoke test",
+          "description": "Load the model inside the container and run a small prediction or equivalent check using the existing scoring interface.",
+          "done_when": "The container exits successfully only if the model works."
+        },
+        {
+          "title": "Build the image in GitHub Actions",
+          "description": "Build after model evaluation and artifact creation, then run the container smoke test.",
+          "done_when": "A bad image fails before publishing."
+        }
+      ]
+    },
+    {
+      "key": "publish",
+      "title": "Publish a tested image to GHCR",
+      "owner": "C",
+      "label": "release",
+      "description": "Publish only from a trusted workflow after all required checks have passed.",
+      "children": [
+        {
+          "title": "Add registry login and image tags",
+          "description": "Use GITHUB_TOKEN with the right package permissions. Tag the image with its source commit SHA.",
+          "done_when": "The image tag identifies the code version and no token is hardcoded."
+        },
+        {
+          "title": "Push only after the smoke test",
+          "description": "Keep the GHCR push behind successful tests, data checks, evaluation and container smoke test. Restrict publishing to main if appropriate.",
+          "done_when": "Failed checks cannot push a release image."
+        },
+        {
+          "title": "Pull and check the published image",
+          "description": "Pull the GHCR image by its immutable tag and run the same smoke test.",
+          "done_when": "The registry image works outside the build job."
+        }
+      ]
+    },
+    {
+      "key": "docs",
+      "title": "Verify the full pipeline and document it",
+      "owner": "team",
+      "label": "docs",
+      "description": "Test the complete path and write down how to run it and what each job protects.",
+      "children": [
+        {
+          "title": "Run the full workflow from a pull request",
+          "description": "Open a PR and follow the checks from code tests to model evaluation. Confirm the final publishing policy works as intended.",
+          "done_when": "There is a green run covering the agreed checks."
+        },
+        {
+          "title": "Document local commands and pipeline stages",
+          "description": "Update README with setup, tests, train/evaluate commands, workflow diagram or short stage list, and how to find artifacts and images.",
+          "done_when": "Someone outside the group can understand and run the project."
+        },
+        {
+          "title": "Check PR contributions and final submission",
+          "description": "Make sure everyone created and reviewed a merged PR. Collect relevant links, screenshots and any requested individual reporting.",
+          "done_when": "The group can demonstrate the pipeline and each person’s contribution."
+        }
+      ]
+    },
+    {
+      "key": "vg",
+      "title": "Measure and improve the pipeline",
+      "owner": "team",
+      "label": "vg",
+      "description": "Only start after the shared pipeline works. Each person chooses two measurable improvements for their own analysis.",
+      "children": [
+        {
+          "title": "Person A: measure CI improvements",
+          "description": "For example, investigate dependency caching or job duration. Record baseline and new timings from comparable runs.",
+          "done_when": "Two changes are explained with before/after results."
+        },
+        {
+          "title": "Person B: measure reliability or image size",
+          "description": "For example, reduce image size or improve smoke test coverage. Use measurements rather than assumptions.",
+          "done_when": "Two changes are explained with before/after results."
+        },
+        {
+          "title": "Person C: measure data or release robustness",
+          "description": "For example, test a changed data schema or safer release tagging. Show what fails before and after.",
+          "done_when": "Two changes are explained with before/after results."
+        }
+      ]
+    }
+  ]
+}

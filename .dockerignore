@@ -3,10 +3,13 @@
 .venv
 .pytest_cache
 .ruff_cache
-__pycache__
-*.pyc
+**/__pycache__
+**/*.pyc
 tests/
 kontroller/
 setup_churn_board.py
 churn_board_plan.json
 uv.lock
+**/*.egg-info
+.env
+.env.*

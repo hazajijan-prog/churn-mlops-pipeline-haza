@@ -136,6 +136,52 @@ jobs:
       - name: Evaluate model
         run: python -m churn.evaluate
 
+  docker-smoke:
+    needs: evaluate
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download model artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: modell-${{ github.sha }}
+          path: outputs/
+
+      - name: Build Docker image
+        run: docker build -t churn-score:${{ github.sha }} .
+
+      - name: Run scoring inside container
+        run: |
+          docker run --name smoke \
+            -e ANTAL=5 \
+            churn-score:${{ github.sha }}
+
+      - name: Check ringlista
+        run: |
+          docker cp smoke:/app/outputs/ringlista.csv ringlista.csv
+
+          python3 - <<'PY'
+          import csv
+          from pathlib import Path
+
+          with Path("ringlista.csv").open(newline="") as file:
+              rows = list(csv.DictReader(file))
+
+          assert len(rows) == 5, f"Expected 5 rows, got {len(rows)}"
+          assert all(
+              0 <= float(row["risk"]) <= 1
+              for row in rows
+          ), "Risk outside [0, 1]"
+
+          print(f"OK: {len(rows)} customers scored")
+          PY
+
+      - name: Remove smoke test container
+        if: always()
+        run: docker rm -f smoke 2>/dev/null || true      
+
   ringlista:
     needs: evaluate
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'

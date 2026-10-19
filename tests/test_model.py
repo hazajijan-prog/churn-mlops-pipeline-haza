@@ -1,7 +1,5 @@
 """Testnivå 3: modell. Kontrakt och reproducerbarhet."""
 
-import json
-from pathlib import Path
 
 import numpy as np
 import pytest

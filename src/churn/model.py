@@ -18,6 +18,7 @@ from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from churn.data import DATAKATALOG, KATEGORISKA, NUMERISKA, dela_upp, las_data, skapa_features
+from churn.provenance import sha256_file
 
 SEED = 42
 DATAFIL = "kundbas.csv"
@@ -57,10 +58,12 @@ def main(utkatalog: Path = Path("outputs")) -> None:
     # Härkomst: vilken commit och vilken datafil modellen kom från.
     # GITHUB_SHA finns bara i GitHub Actions. Lokalt står det "lokal".
     matvarden["commit"] = os.environ.get("GITHUB_SHA", "lokal")
+    matvarden["run_id"] = os.environ.get("GITHUB_RUN_ID", "lokal")
     matvarden["datafil"] = DATAFIL
     matvarden["data_sha256"] = hashlib.sha256((DATAKATALOG / DATAFIL).read_bytes()).hexdigest()
     utkatalog.mkdir(exist_ok=True)
     joblib.dump(modell, utkatalog / "modell.joblib")
+    matvarden["model_sha256"] = sha256_file(utkatalog / "modell.joblib")
     (utkatalog / "matvarden.json").write_text(json.dumps(matvarden, indent=2))
     print(json.dumps(matvarden, indent=2))
 

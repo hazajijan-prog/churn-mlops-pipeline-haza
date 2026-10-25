@@ -29,6 +29,7 @@ concurrency:
 
 permissions:
   contents: read
+  attestations: read
 
 
 jobs:
@@ -67,6 +68,11 @@ jobs:
     needs: [test, datakontroll]
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
     steps:
       - uses: actions/checkout@v7
 
@@ -75,6 +81,13 @@ jobs:
           python-version: "3.11"
 
       - run: python -m churn.model
+
+      - name: Attest model provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            outputs/modell.joblib
+            outputs/matvarden.json
 
       - name: Upload model artifact
         uses: actions/upload-artifact@v4
@@ -100,6 +113,8 @@ jobs:
           name: modell-${{ github.sha }}
           path: outputs/
 
+      - uses: ./.github/actions/verify-model
+
       - name: Write model summary
         run: |
           python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
@@ -117,7 +132,9 @@ jobs:
           print(f"| ROC AUC | {metrics['roc_auc']:.4f} |")
           print(f"| Accuracy | {metrics['accuracy']:.4f} |")
           print(f"| Commit | `{metrics['commit']}` |")
+          print(f"| Run ID | `{metrics['run_id']}` |")
           print(f"| Data SHA256 | `{metrics['data_sha256']}` |")
+          print(f"| Model SHA256 | `{metrics['model_sha256']}` |")
           PY
 
       - name: Evaluate model
@@ -135,6 +152,8 @@ jobs:
         with:
           name: modell-${{ github.sha }}
           path: outputs/
+
+      - uses: ./.github/actions/verify-model
 
       - name: Build Docker image
         run: |
@@ -234,6 +253,8 @@ jobs:
         with:
           name: modell-${{ github.sha }}
           path: outputs/
+
+      - uses: ./.github/actions/verify-model
 
       - name: Generate ringlista
         run: python -m churn.score

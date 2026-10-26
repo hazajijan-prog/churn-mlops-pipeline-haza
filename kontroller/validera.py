@@ -32,6 +32,17 @@ def main(fil: str) -> int:
 
     except pa.errors.SchemaErrors as e:
         print(f"STOPP: {fil} klarar inte schemat")
+        ovantade = [namn for namn in df.columns if namn not in SCHEMA.columns]
+        saknade = [
+            namn for namn, kolumn in SCHEMA.columns.items()
+            if kolumn.required and namn not in df.columns
+        ]
+        if ovantade:
+            print(f"Oväntade kolumner: {', '.join(ovantade)}.")
+            print("Åtgärd: Ta bort oväntade kolumner eller stäm av schemaändringen.")
+        if saknade:
+            print(f"Obligatoriska kolumner saknas: {', '.join(saknade)}.")
+            print("Åtgärd: Återställ kolumnerna med rätt namn och innehåll.")
         print(e.failure_cases)
         return 1
 

@@ -59,7 +59,7 @@ jobs:
           install-dev: "true"
 
       - name: Run unit tests
-        run: pytest --ignore=tests/test_api.py
+        run: python -m pytest --ignore=tests/test_api.py
 
   train:
     needs: [test, datakontroll]

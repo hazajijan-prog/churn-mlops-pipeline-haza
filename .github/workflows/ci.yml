@@ -61,8 +61,52 @@ jobs:
       - name: Run unit tests
         run: python -m pytest --ignore=tests/test_api.py
 
+  dependency-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/setup-project
+        with:
+          python-version: "3.11"
+
+      - name: List installed runtime dependencies
+        run: pip freeze --exclude-editable > installed.txt
+
+      - name: Scan dependencies for known vulnerabilities
+        id: audit
+        run: |
+          pipx run --spec pip-audit==2.9.0 pip-audit \
+            --requirement installed.txt \
+            --no-deps \
+            --disable-pip \
+            --aliases \
+            --progress-spinner off \
+            --format markdown \
+            --output audit.md
+
+      - name: Write scan summary
+        if: always()
+        env:
+          AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+        run: |
+          {
+            echo "## Dependency scan"
+            echo
+            echo "Scanned $(wc -l < installed.txt) installed packages."
+            echo
+            if [[ "$AUDIT_OUTCOME" == "success" ]]; then
+              echo "No known vulnerabilities found."
+            elif [[ -s audit.md ]]; then
+              cat audit.md
+            else
+              echo "The scan could not be completed, see the log."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   train:
-    needs: [test, datakontroll]
+    needs: [test, datakontroll, dependency-scan]
     runs-on: ubuntu-latest
 
     steps:

@@ -1,4 +1,3 @@
-
 name: CI
 
 on:
@@ -26,10 +25,8 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-
 permissions:
   contents: read
-
 
 jobs:
   datakontroll:
@@ -61,7 +58,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
           install-dev: "true"
 
-      - run: pytest
+      - name: Run unit tests
+        run: pytest --ignore=tests/test_api.py
 
   train:
     needs: [test, datakontroll]
@@ -93,12 +91,16 @@ jobs:
       - uses: ./.github/actions/setup-project
         with:
           python-version: "3.11"
+          install-dev: "true"
 
       - name: Download model artifact
         uses: actions/download-artifact@v4
         with:
           name: modell-${{ github.sha }}
           path: outputs/
+
+      - name: Test FastAPI
+        run: pytest tests/test_api.py -v
 
       - name: Write model summary
         run: |
@@ -172,7 +174,6 @@ jobs:
       - name: Save Docker image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         run: docker save churn-score:${{ github.sha }} -o image.tar
-        
 
       - name: Upload Docker image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -184,7 +185,7 @@ jobs:
 
       - name: Remove smoke test container
         if: always()
-        run: docker rm -f smoke 2>/dev/null || true      
+        run: docker rm -f smoke 2>/dev/null || true
 
   publish:
     needs: docker-smoke

@@ -187,6 +187,71 @@ jobs:
         if: always()
         run: docker rm -f smoke 2>/dev/null || true
 
+  docker-api-smoke:
+    needs: evaluate
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download model artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: modell-${{ github.sha }}
+          path: outputs/
+
+      - name: Build API image
+        run: |
+          docker build \
+            -f Dockerfile.API \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            -t churn-api:${{ github.sha }} .
+
+      - name: Start API container
+        run: docker run -d --name api-smoke -p 8000:8000 churn-api:${{ github.sha }}
+
+      - name: Wait for API health
+        run: |
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:8000/health && exit 0
+            sleep 1
+          done
+          docker logs api-smoke
+          exit 1
+
+      - name: Check prediction
+        run: |
+          curl -fsS -X POST http://localhost:8000/predict \
+            -H "Content-Type: application/json" \
+            -d '{"alder": 42, "manader_som_kund": 18, "manadskostnad": 399, "data_gb_per_manad": 25, "supportarenden_12m": 3, "region": "Stockholm", "abonnemang": "Bas"}' \
+            -o prediction.json
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          risk = json.loads(Path("prediction.json").read_text())["churn_risk"]
+          assert 0 <= risk <= 1, f"Risk outside [0, 1]: {risk}"
+
+          print(f"OK: churn_risk={risk}")
+          PY
+      - name: Save Docker image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: docker save api-smoke:${{ github.sha }} -o image.tar
+
+      - name: Upload Docker image
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image-${{ github.sha }}
+          path: image.tar
+          if-no-files-found: error
+
+      - name: Remove API container
+        if: always()
+        run: docker rm -f api-smoke 2>/dev/null || true
+
   publish:
     needs: docker-smoke
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'

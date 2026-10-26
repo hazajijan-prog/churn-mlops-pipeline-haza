@@ -204,12 +204,22 @@ jobs:
 
       - uses: ./.github/actions/verify-model
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build Docker image
-        run: |
-          docker build \
-            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
-            --label "org.opencontainers.image.revision=${{ github.sha }}" \
-            -t churn-score:${{ github.sha }} .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: churn-score:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=churn-score
+          cache-to: type=gha,mode=max,scope=churn-score
 
       - name: Run scoring inside container
         run: |
@@ -268,13 +278,22 @@ jobs:
 
       - uses: ./.github/actions/verify-model
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build API image
-        run: |
-          docker build \
-            -f Dockerfile.API \
-            --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
-            --label "org.opencontainers.image.revision=${{ github.sha }}" \
-            -t churn-api:${{ github.sha }} .
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.API
+          push: false
+          load: true
+          tags: churn-api:${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=churn-api
+          cache-to: type=gha,mode=max,scope=churn-api
 
       - name: Start API container
         run: docker run -d --name api-smoke -p 8000:8000 churn-api:${{ github.sha }}

@@ -1,0 +1,31 @@
+name: Verify model provenance
+description: Check that the downloaded model is the one this run trained and signed
+
+inputs:
+  path:
+    description: Directory containing modell.joblib and matvarden.json
+    required: false
+    default: outputs
+
+runs:
+  using: composite
+  steps:
+    - name: Check model hash and commit
+      shell: bash
+      env:
+        PYTHONPATH: src
+        MODEL_DIR: ${{ inputs.path }}
+      run: python3 -m churn.provenance "$MODEL_DIR"
+
+    - name: Verify signed attestations
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        MODEL_DIR: ${{ inputs.path }}
+      run: |
+        for file in "$MODEL_DIR/modell.joblib" "$MODEL_DIR/matvarden.json"; do
+          gh attestation verify "$file" \
+            --repo "$GITHUB_REPOSITORY" \
+            --signer-workflow "$GITHUB_WORKFLOW_REF" \
+            --source-digest "$GITHUB_SHA"
+        done

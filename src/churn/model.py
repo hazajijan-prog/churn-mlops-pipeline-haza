@@ -18,6 +18,7 @@ from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from churn.data import DATAKATALOG, KATEGORISKA, NUMERISKA, dela_upp, las_data, skapa_features
+from churn.provenance import sha256_file
 
 SEED = 42
 DATAFIL = "kundbas.csv"
@@ -68,6 +69,7 @@ def main(utkatalog: Path = Path("outputs")) -> None:
     metadata: dict[str, float | str] = {
         **matvarden,
         "commit": os.environ.get("GITHUB_SHA", "lokal"),
+        "run_id": os.environ.get("GITHUB_RUN_ID", "lokal"),
         "datafil": DATAFIL,
         "data_sha256": hashlib.sha256((DATAKATALOG / DATAFIL).read_bytes()).hexdigest(),
     }
@@ -75,6 +77,7 @@ def main(utkatalog: Path = Path("outputs")) -> None:
     utkatalog.mkdir(exist_ok=True)
 
     joblib.dump(modell, utkatalog / "modell.joblib")
+    metadata["model_sha256"] = sha256_file(utkatalog / "modell.joblib")
 
     (utkatalog / "matvarden.json").write_text(json.dumps(metadata, indent=2))
 

@@ -2,7 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+ENV PYTHONPATH=/app/src
+
 COPY pyproject.toml .
+
 
 # Installera runtime-beroenden innan koden kopieras.
 RUN python - <<'PY'
@@ -19,7 +22,8 @@ subprocess.check_call(
 PY
 
 COPY src/ ./src/
-RUN pip install --no-cache-dir --no-deps .
+RUN pip uninstall -y churn && \
+    pip install --no-cache-dir --no-deps -e .
 
 COPY data/ ./data/
 

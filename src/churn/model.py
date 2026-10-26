@@ -24,6 +24,19 @@ SEED = 42
 DATAFIL = "kundbas.csv"
 
 
+def hamta_tranings_och_testdata(filnamn: str = DATAFIL):
+    """Skapa reproducerbar train/test-uppdelning."""
+    X, y = dela_upp(skapa_features(las_data(filnamn)))
+
+    return train_test_split(
+        X,
+        y,
+        test_size=0.25,
+        random_state=SEED,
+        stratify=y,
+    )
+
+
 def bygg_modell() -> Pipeline:
     forbehandling = ColumnTransformer(
         [
@@ -40,10 +53,7 @@ def bygg_modell() -> Pipeline:
 
 
 def trana_och_utvardera(filnamn: str = DATAFIL) -> tuple[Pipeline, dict[str, float]]:
-    X, y = dela_upp(skapa_features(las_data(filnamn)))
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.25, random_state=SEED, stratify=y
-    )
+    X_train, X_test, y_train, y_test = hamta_tranings_och_testdata(filnamn)
     modell = bygg_modell().fit(X_train, y_train)
     sannolikhet = modell.predict_proba(X_test)[:, 1]
     matvarden = {
@@ -55,17 +65,23 @@ def trana_och_utvardera(filnamn: str = DATAFIL) -> tuple[Pipeline, dict[str, flo
 
 def main(utkatalog: Path = Path("outputs")) -> None:
     modell, matvarden = trana_och_utvardera()
-    # Härkomst: vilken commit och vilken datafil modellen kom från.
-    # GITHUB_SHA finns bara i GitHub Actions. Lokalt står det "lokal".
-    matvarden["commit"] = os.environ.get("GITHUB_SHA", "lokal")
-    matvarden["run_id"] = os.environ.get("GITHUB_RUN_ID", "lokal")
-    matvarden["datafil"] = DATAFIL
-    matvarden["data_sha256"] = hashlib.sha256((DATAKATALOG / DATAFIL).read_bytes()).hexdigest()
+
+    metadata: dict[str, float | str] = {
+        **matvarden,
+        "commit": os.environ.get("GITHUB_SHA", "lokal"),
+        "run_id": os.environ.get("GITHUB_RUN_ID", "lokal"),
+        "datafil": DATAFIL,
+        "data_sha256": hashlib.sha256((DATAKATALOG / DATAFIL).read_bytes()).hexdigest(),
+    }
+
     utkatalog.mkdir(exist_ok=True)
+
     joblib.dump(modell, utkatalog / "modell.joblib")
-    matvarden["model_sha256"] = sha256_file(utkatalog / "modell.joblib")
-    (utkatalog / "matvarden.json").write_text(json.dumps(matvarden, indent=2))
-    print(json.dumps(matvarden, indent=2))
+    metadata["model_sha256"] = sha256_file(utkatalog / "modell.joblib")
+
+    (utkatalog / "matvarden.json").write_text(json.dumps(metadata, indent=2))
+
+    print(json.dumps(metadata, indent=2))
 
 
 if __name__ == "__main__":

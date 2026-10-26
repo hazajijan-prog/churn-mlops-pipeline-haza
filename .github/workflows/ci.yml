@@ -238,14 +238,14 @@ jobs:
           PY
       - name: Save Docker image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: docker save api-smoke:${{ github.sha }} -o image.tar
+        run: docker save churn-api:${{ github.sha }} -o api-image.tar
 
       - name: Upload Docker image
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
-          name: docker-image-${{ github.sha }}
-          path: image.tar
+          name: docker-api-image-${{ github.sha }}
+          path: api-image.tar
           if-no-files-found: error
 
       - name: Remove API container

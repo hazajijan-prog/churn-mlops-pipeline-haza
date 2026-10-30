@@ -443,3 +443,38 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/churn-mlops-pipeline-haza-api:${{ github.sha }}
+
+  
+  deploy:
+    # Körs när API-imagen har publicerats
+    needs: publish-api
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    # Kräver godkännande före produktion
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Installerar kubectl
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      # Ansluter till kursens Kubernetes-kluster
+      - name: Configure Kubernetes
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBECONFIG }}
+        run: |
+          printf '%s' "$KUBE_CONFIG" > "$RUNNER_TEMP/kubeconfig"
+          chmod 600 "$RUNNER_TEMP/kubeconfig"
+          echo "KUBECONFIG=$RUNNER_TEMP/kubeconfig" >> "$GITHUB_ENV"
+
+      # Rullar ut API-imagen med rätt commit-SHA
+      - name: Deploy to Kubernetes
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/churn-mlops-pipeline-haza-api:${{ github.sha }}
+        run: |
+          kubectl apply -f k8s/service.yaml
+          sed "s|image: churn-api:dev|image: $IMAGE|" k8s/deployment.yaml | kubectl apply -f -
+          kubectl rollout status deployment/churn-api --timeout=180s

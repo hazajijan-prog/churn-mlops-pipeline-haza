@@ -1,0 +1,57 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: churn-api
+
+spec:
+  # Antal pods som ska köra vår API-tjänst
+  replicas: 2
+
+  # Kopplar Deployment till pods med samma etikett
+  selector:
+    matchLabels:
+      app: churn-api
+
+  template:
+    metadata:
+      labels:
+        app: churn-api
+
+    spec:
+      containers:
+        - name: churn-api
+
+          # Docker-image med commit-SHA istället för latest
+          # Ersätts med rätt SHA när imagen är publicerad
+          image: churn-api:dev
+          imagePullPolicy: IfNotPresent
+
+          # FastAPI kör på port 8000
+          ports:
+            - containerPort: 8000
+
+          # Requests = resurser som Kubernetes reserverar
+          # Limits = högsta tillåtna resursförbrukning
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 384Mi
+
+          # Kontrollerar om podden kan ta emot trafik
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 5
+
+          # Kontrollerar om containern lever
+          # Startar om den vid upprepade fel
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10

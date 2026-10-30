@@ -399,3 +399,47 @@ jobs:
           name: ringlista-${{ github.sha }}
           path: outputs/ringlista.csv
           if-no-files-found: error
+
+
+
+  publish-api:
+    # Publicerar API-imagen efter godkänt Docker-test
+    needs: docker-api-smoke
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Hämtar modellen från samma pipeline-körning
+      - name: Download model
+        uses: actions/download-artifact@v4
+        with:
+          name: modell-${{ github.sha }}
+          path: outputs/
+
+      # Förbereder bygge för kursklustrets ARM64
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      # Loggar in i GitHub Container Registry
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Bygger och publicerar API-imagen med commit-SHA
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.API
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/churn-mlops-pipeline-haza-api:${{ github.sha }}

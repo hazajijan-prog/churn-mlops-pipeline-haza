@@ -366,7 +366,7 @@ jobs:
 
       - name: Tag and push image
         run: |
-          IMAGE="ghcr.io/pytt156/churn-mlops-pipeline:${{ github.sha }}"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/churn-mlops-pipeline:${{ github.sha }}"
           docker tag churn-score:${{ github.sha }} "$IMAGE"
           docker push "$IMAGE"
 
